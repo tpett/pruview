@@ -99,6 +99,18 @@ module Pruview
         image = MiniMagick::Image.open(@image.path)
         crop_image(image, crop)
         if crop || @image[:width].to_i > width || @image[:height] > height
+          # If image is bigger than the resize threshold use sampling to size it down first
+          # and then perform the resize on the proxy image.
+          if image[:width] * image[:height] > RESIZE_THRESHOLD
+            ratio = image[:width].to_f / image[:height].to_f
+            proxy_width = RESIZE_THRESHOLD.to_f / ratio
+            proxy_height = RESIZE_THRESHOLD.to_f * ratio
+            puts "Image is beyond resize threshold of #{RESIZE_THRESHOLD}px"
+            puts "Creating sample proxy at #{proxy_width}x#{proxy_height}"
+            image.sample "#{proxy_width}x#{proxy_height}" do |cmd|
+              cmd.args << CONFIG_OPTIONS
+            end
+          end
           image.resize "#{width}x#{height}" do |cmd|
             cmd.args << CONFIG_OPTIONS
           end
@@ -149,6 +161,7 @@ module Pruview
   # Configurations
   Document::PROCESS_FORMAT = 'jpg'
   Document::CONFIG_OPTIONS = '-limit memory 500mb'
+  Document::RESIZE_THRESHOLD = 5_000_000 # 5 Megapixels
 
   Document::PSD_EXT = '.psd'
   Document::POSTSCRIPT_EXT = ['.pdf', '.eps', '.ai']
